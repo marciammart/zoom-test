@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.13",
+    "@mui/material": "^5.15.13",
     "@zoom/videosdk": "^1.10.8",
     "jsrsasign": "^11.1.0",
     "next": "14.1.3",

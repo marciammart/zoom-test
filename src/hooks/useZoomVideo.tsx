@@ -9,6 +9,8 @@ interface IZoomConnectOptions {
 export default function useZoomVideo() {
   const [zoomClient, setZoomClient] = useState();
   const [mediaStream, setMediaStream] = useState();
+  const [localParticipant, setLocalParticipant] = useState();
+  const [remoteParticipant, setRemoteParticipant] = useState();
 
   useEffect(() => {
     const { default: ZoomVideo } = require("@zoom/videosdk");
@@ -31,22 +33,16 @@ export default function useZoomVideo() {
     }) => {
       if (!zoomClient) return;
 
-      await zoomClient.init("en-US", "Global", { patchJsMedia: true });
+      await zoomClient.init("en-US", "Global", {
+        patchJsMedia: true,
+        enforceMultipleVideos: true,
+      });
       await zoomClient.join(options.sessionName, token, options.userName);
       const mediaStream = zoomClient!.getMediaStream();
-      setMediaStream(mediaStream);
 
-      // render videos of participants already in the meeting
-      zoomClient!.getAllUser().forEach((user) => {
-        if (user.bVideoOn) {
-          mediaStream.attachVideo(user.userId, 3).then((userVideo) => {
-            const videoContainer = document.querySelector(
-              "video-player-container"
-            ) as Element;
-            videoContainer.appendChild(userVideo as VideoPlayer);
-          });
-        }
-      });
+      mediaStream.startAudio();
+
+      setMediaStream(mediaStream);
     },
     [zoomClient]
   );
@@ -56,15 +52,7 @@ export default function useZoomVideo() {
     if (mediaStream!.isCapturingVideo()) {
       mediaStream!.stopVideo().then(() => mediaStream!.detachVideo(userId));
     } else {
-      const videoPlayerContainer = document.querySelector(
-        "video-player-container"
-      );
-      mediaStream!.startVideo().then(() => {
-        mediaStream!.attachVideo(userId, 3).then((userVideo) => {
-          console.log("local user video player", userVideo);
-          videoPlayerContainer?.appendChild(userVideo as VideoPlayer);
-        });
-      });
+      mediaStream!.startVideo();
     }
   };
 
@@ -85,35 +73,51 @@ export default function useZoomVideo() {
     }
   };
 
-  const handlePeerVideoStateChange = (payload) => {
-    const mediaStream = zoomClient.getMediaStream();
-    if (payload.action === "Start") {
-      // a user turned on their video, render it
-      mediaStream.attachVideo(payload.userId, 3).then((userVideo) => {
-        const videoPlayerContainer = document.querySelector(
-          "video-player-container"
-        ) as Element;
-        console.log("remote user video player", userVideo);
-        videoPlayerContainer.appendChild(userVideo as VideoPlayer);
+  const updateParticipants = useCallback(
+    (participants) => {
+      const localParticipant = zoomClient?.getCurrentUserInfo();
+      participants.forEach((participant) => {
+        if (participant.userId === localParticipant?.userId)
+          setLocalParticipant({ ...localParticipant, ...participant });
+        else {
+          const remoteParticipant = zoomClient?.getUser(participant.userId);
+          setRemoteParticipant({ ...remoteParticipant, ...participant });
+        }
       });
-    } else if (payload.action === "Stop") {
-      // a user turned off their video, stop rendering it
-      mediaStream.detachVideo(payload.userId);
-    }
-  };
+    },
+    [zoomClient]
+  );
+
+  const removeParticipants = useCallback(
+    (participants) => {
+      const localParticipant = zoomClient?.getCurrentUserInfo();
+      participants.forEach((participant) => {
+        if (participant.userId === localParticipant?.userId)
+          setLocalParticipant(undefined);
+        else {
+          setRemoteParticipant(undefined);
+        }
+      });
+    },
+    [zoomClient]
+  );
 
   useEffect(() => {
     if (zoomClient) {
       window.addEventListener("unload", disconnect);
       window.addEventListener("pagehide", disconnect);
 
-      zoomClient.on("peer-video-state-change", handlePeerVideoStateChange);
+      zoomClient.on("user-added", updateParticipants);
+      zoomClient.on("user-removed", removeParticipants);
+      zoomClient.on("user-updated", updateParticipants);
 
       return () => {
         window.removeEventListener("unload", disconnect);
         window.removeEventListener("pagehide", disconnect);
 
-        zoomClient.off("peer-video-state-change", handlePeerVideoStateChange);
+        zoomClient.off("user-added", updateParticipants);
+        zoomClient.off("user-removed", removeParticipants);
+        zoomClient.off("user-updated", updateParticipants);
 
         disconnect();
       };
@@ -127,5 +131,7 @@ export default function useZoomVideo() {
     connect,
     toggleVideo,
     toggleMic,
+    localParticipant,
+    remoteParticipant,
   };
 }
