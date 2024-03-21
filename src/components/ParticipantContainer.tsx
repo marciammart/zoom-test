@@ -21,12 +21,9 @@ export const ParticipantContainer = ({
     <div
       style={{
         position: "relative",
-        backgroundColor: "black",
       }}
     >
       <video-player
-        node-id={participant.userId}
-        media-type="video"
         ref={videoPlayerRef}
         style={{ width: "400px", height: "auto", aspectRatio: "16/9" }}
       ></video-player>

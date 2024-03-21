@@ -27,7 +27,12 @@ export default function Home() {
 
   return (
     <main>
-      <style>{`video-player-container { width: 400px; }`}</style>
+      <style>{`
+        video-player-container {
+          width: 400px;
+          background-color: black;
+        }
+      `}</style>
       <div>Meeting Room</div>
       {mediaStream ? (
         <>
